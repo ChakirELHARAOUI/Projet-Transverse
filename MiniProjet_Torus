@@ -1,0 +1,147 @@
+from typing import List, Tuple, Set
+import sys
+
+def modular_distance(a: int, b: int, N: int) -> int:
+    """Calcule la distance modulaire entre a et b dans une grille de taille N."""
+    return min(abs(a - b), N - abs(a - b))
+
+def point_a_voisin(p: Tuple[int, int], points: Set[Tuple[int, int]], N: int) -> bool:
+    """
+    Renvoie True si le point p a au moins un voisin (distinct) dans l'ensemble points,
+    où la distance modulaire pour chacune des coordonnées est < 2.
+    """
+    for q in points:
+        if q != p:
+            if modular_distance(p[0], q[0], N) < 2 and modular_distance(p[1], q[1], N) < 2:
+                return True
+    return False
+
+
+Candidate = Tuple[Tuple[int, int], int, str, Set[Tuple[int, int]]]
+
+def generer_candidates_tore(taille: int) -> List[Candidate]:
+    """
+    Génère tous les candidats de carrés dans une grille de taille 'taille'
+    en considérant la grille comme un tore (wrap-around).
+    On autorise des candidats de taille minimale 1, mais nous filtrerons ensuite
+    ceux de taille 1 si le point couvert n'est pas isolé.
+    """
+    candidats = []
+    for i in range(taille):
+        for j in range(taille):
+            for s in range(1, taille+1):
+                covered = { ((i + di) % taille, (j + dj) % taille)
+                           for di in range(s) for dj in range(s) }
+                candidats.append(((i, j), s, "tore", covered))
+    return candidats
+
+def couvrir_points_optimal_tore(points: Set[Tuple[int, int]], candidats: List[Candidate], taille: int) -> Tuple[List[Candidate], int]:
+    """
+    Recherche par backtracking une combinaison de candidats (adaptés pour un tore)
+    dont l'union recouvre tous les points dans 'points' et dont la somme des aires (size^2) est minimale.
+    Avant de considérer un candidat de taille 1, on rejette ce candidat s'il couvre un point ayant un voisin modulaire.
+    """
+    best_solution = None
+    best_area = sys.maxsize
+
+    def backtrack(covered: Set[Tuple[int, int]], sol: List[Candidate], area: int, start: int):
+        nonlocal best_solution, best_area
+        if points.issubset(covered):
+            if area < best_area:
+                best_area = area
+                best_solution = sol.copy()
+            return
+        if area >= best_area:
+            return
+        for i in range(start, len(candidats)):
+            cand = candidats[i]
+            # Filtrer les candidats de taille 1 si le point couvert n'est pas isolé
+            if cand[1] == 1:
+                pts_couverts = cand[3] & points
+                if pts_couverts:
+                    for p in pts_couverts:
+                        if point_a_voisin(p, points, taille):
+                            # Ce candidat de taille 1 ne doit pas être utilisé
+                            break
+                    else:
+                        # Aucun voisin, candidate acceptable
+                        pass
+                    # Si on a trouvé un voisin, on saute ce candidat.
+                    if any(point_a_voisin(p, points, taille) for p in pts_couverts):
+                        continue
+
+            if not (cand[3] & (points - covered)):
+                continue
+            new_covered = covered.union(cand[3])
+            backtrack(new_covered, sol + [cand], area + cand[1]**2, i+1)
+
+    backtrack(set(), [], 0, 0)
+    return best_solution, best_area
+
+def afficher_matrice_tore(taille: int, points: Set[Tuple[int, int]], covered: Set[Tuple[int, int]]) -> None:
+    """Affiche la grille en considérant le tore (indices de 0 à taille-1)."""
+    grille = [["0" for _ in range(taille)] for _ in range(taille)]
+    for (i, j) in points:
+        grille[i][j] = "N"
+    for (i, j) in covered:
+        if grille[i][j] == "N":
+            grille[i][j] = "C"
+        else:
+            grille[i][j] = "X"
+    print("\nMatrice (tore) :")
+    for ligne in grille:
+        print(" ".join(ligne))
+    print()
+
+def saisir_entier(message: str) -> int:
+    while True:
+        try:
+            valeur = int(input(message).strip())
+            if valeur < 1:
+                print("Veuillez entrer un entier positif.")
+                continue
+            return valeur
+        except ValueError:
+            print("Entrée invalide. Veuillez entrer un entier.")
+
+def saisir_coordonnees(taille: int) -> Tuple[int, int]:
+    """Demande à l'utilisateur de saisir une coordonnée (ligne, colonne)."""
+    while True:
+        try:
+            ligne = int(input(f"Entrez la ligne (0 à {taille-1}) : ").strip())
+            colonne = int(input(f"Entrez la colonne (0 à {taille-1}) : ").strip())
+            if 0 <= ligne < taille and 0 <= colonne < taille:
+                return (ligne, colonne)
+            else:
+                print(f"Erreur : les valeurs doivent être entre 0 et {taille-1}.")
+        except ValueError:
+            print("Entrée invalide. Veuillez entrer des entiers.")
+
+if __name__ == "__main__":
+    taille = saisir_entier("Entrez la taille de la grille carrée : ")
+    nb_points = saisir_entier("Entrez le nombre de points noirs : ")
+    points: Set[Tuple[int, int]] = set()
+    print("Entrez les coordonnées des points noirs (ligne, colonne) :")
+    for _ in range(nb_points):
+        points.add(saisir_coordonnees(taille))
+    print("\nPoints noirs :", points)
+    
+    candidats = generer_candidates_tore(taille)
+    print(f"\n{len(candidats)} candidats générés pour le tore.")
+    
+    solution, area = couvrir_points_optimal_tore(points, candidats, taille)
+    if solution is None:
+        print("Aucune solution trouvée.")
+    else:
+        print("\n=== Solution Optimale pour le Tore ===")
+        for idx, cand in enumerate(solution):
+            top_left, s, orient, cov = cand
+            print(f"Carré {idx+1}: Coin supérieur gauche = {top_left}, Taille = {s}, Orientation = {orient}, Aire = {s*s}")
+        print(f"\nSurface totale couverte : {area}")
+        
+        final_covered = set()
+        for cand in solution:
+            final_covered.update(cand[3])
+        afficher_matrice_tore(taille, points, final_covered)
+
+    
