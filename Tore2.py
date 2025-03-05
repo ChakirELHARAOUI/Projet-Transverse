@@ -18,7 +18,7 @@ def calculer_taille_carre_tore(point1, point2, taille_grille):
     return max(dx_tore, dy_tore) + 1
 
 def afficher_matrice(taille_grille, points_noirs, points_couverts):
-    """Affiche la matrice en mode tore."""
+    """Affiche la matrice en mode tore avec les points noirs couverts par 'C'."""
     grille = [["0" for _ in range(taille_grille)] for _ in range(taille_grille)]
     
     # Placement des points noirs
@@ -27,7 +27,10 @@ def afficher_matrice(taille_grille, points_noirs, points_couverts):
 
     # Placement des points couverts
     for (x, y) in points_couverts:
-        grille[x][y] = "X"  # X pour une zone couverte
+        if grille[x][y] == "N":
+            grille[x][y] = "C"  # C pour un point noir couvert
+        else:
+            grille[x][y] = "X"  # X pour une zone couverte
 
     # Affichage
     print("\nMatrice finale :")
@@ -35,7 +38,7 @@ def afficher_matrice(taille_grille, points_noirs, points_couverts):
         print(" ".join(ligne))
     print("\n")
 
-def ajouter_carre_tore(coord, taille, taille_grille, points_couverts):
+def ajouter_carre_tore(coord, taille, taille_grille, points_couverts, points_noirs):
     """Ajoute un carré tout en tenant compte des connexions en tore."""
     x, y = coord
     for i in range(taille):
@@ -54,7 +57,7 @@ def couvrir_points_noirs_tore(points_noirs, taille_grille):
         nonlocal surface_totale
         surface_totale += taille ** 2
         carres_utilises.append((coord, taille))
-        ajouter_carre_tore(coord, taille, taille_grille, points_couverts)
+        ajouter_carre_tore(coord, taille, taille_grille, points_couverts, points_noirs)
 
     # Couvrir chaque point noir
     for point in points_noirs:
